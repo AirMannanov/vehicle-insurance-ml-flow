@@ -1,10 +1,17 @@
 # Python
 __pycache__/
+.venv/
+*.egg-info/
 
 # IDE
 .idea/
 .vscode/
 .cursor/
+
+# Data & artifacts
+data/*.csv
+storage/
+artifacts/
 
 # logs
 logs/

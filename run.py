@@ -34,6 +34,26 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def run_update(config: dict, db: Database) -> None:
+    from src.data.loader import download_dataset, load_all_csv
+    from src.data.batch_generator import generate_batches
+    from src.data.storage import save_all_batches
+
+    import logging
+    logger = logging.getLogger("mlops")
+
+    raw_dir = get_nested(config, "data", "raw_dir", default="data")
+    time_col = get_nested(config, "data", "time_column", default="INSR_BEGIN")
+
+    data_dir = download_dataset(dest_dir=raw_dir)
+    df = load_all_csv(data_dir)
+
+    batches = generate_batches(df, time_column=time_col)
+    inserted = save_all_batches(db, batches)
+
+    logger.info("Update complete: %d new batches ingested", inserted)
+
+
 def main() -> None:
     args = parse_args()
     config = load_config(args.config)
@@ -54,10 +74,12 @@ def main() -> None:
         raise NotImplementedError("Inference mode not yet implemented")
 
     elif args.mode == "update":
-        raise NotImplementedError("Update mode not yet implemented")
+        run_update(config, db)
 
     elif args.mode == "summary":
         raise NotImplementedError("Summary mode not yet implemented")
+
+    db.close()
 
 
 if __name__ == "__main__":

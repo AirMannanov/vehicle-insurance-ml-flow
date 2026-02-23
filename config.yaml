@@ -1,0 +1,11 @@
+data:
+  path: "data/ethiopian_insurance.csv"
+  time_column: "TransactionMonth"
+  target_column: "ResponseFlag"
+
+storage:
+  db_path: "storage/mlops.sqlite"
+
+logging:
+  level: "INFO"
+  log_file: "logs/mlops.log"

@@ -1,18 +1,13 @@
 import json
 import logging
 from dataclasses import dataclass
-from typing import Literal
 
 import pandas as pd
 
 from src.database.connection import Database
+from src.database.dataset_schema import ValueType, get_value_type
 
 logger = logging.getLogger("mlops")
-
-# Integer columns with at most this many unique values are treated as categorical for stats.
-MAX_UNIQUE_FOR_INT_AS_CATEGORICAL = 50
-
-ValueType = Literal["numeric", "categorical"]
 
 
 @dataclass
@@ -25,27 +20,20 @@ class DQRow:
     stats_json: str | None
 
 
-def compute_batch_dq(
-    df: pd.DataFrame,
-    max_unique_int_as_categorical: int = MAX_UNIQUE_FOR_INT_AS_CATEGORICAL,
-) -> list[DQRow]:
+def compute_batch_dq(df: pd.DataFrame) -> list[DQRow]:
     """Compute data quality metrics for each column of the batch.
 
-    Returns a list of DQRow. stats_json: for numeric columns (except low-cardinality
-    integers) — min, max, mean, std; for categorical and int-as-categorical —
-    top 10 value counts (JSON string).
+    Returns a list of DQRow. stats_json: for numeric — min, max, mean, std;
+    for categorical — top 10 value counts (JSON string). Uses dataset schema (get_value_type).
     """
     rows = []
     for col in df.columns:
         s = df[col]
         missing_rate = float(s.isna().mean())
         unique_count = int(s.nunique())
+        value_type: ValueType = get_value_type(col)
 
-        is_low_card_int = (
-            pd.api.types.is_integer_dtype(s) and unique_count <= max_unique_int_as_categorical
-        )
-        if pd.api.types.is_numeric_dtype(s) and not is_low_card_int:
-            value_type: ValueType = "numeric"
+        if value_type == "numeric":
             valid = s.dropna()
             if len(valid) == 0:
                 stats = {}
@@ -57,7 +45,6 @@ def compute_batch_dq(
                     "std": float(valid.std()) if len(valid) > 1 else 0.0,
                 }
         else:
-            value_type = "categorical"
             top = s.value_counts().head(10)
             stats = {str(k): int(v) for k, v in top.items()}
 

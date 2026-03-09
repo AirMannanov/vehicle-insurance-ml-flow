@@ -9,6 +9,7 @@ from src.tools import get_nested, load_config, setup_logger
 from src.data.bootstrap import seed_from_kaggle
 from src.data.storage import load_batch
 from src.analysis.data_quality import compute_batch_dq, save_batch_dq
+from src.analysis.association_rules import compute_assoc_rules, save_assoc_rules
 from src.database import Database, Migrator, reset_db
 
 
@@ -56,6 +57,7 @@ class PipelineRunner:
                 self.logger.info("Applied migration: %s", name)
             inserted = seed_from_kaggle(self.config, db)
             self._run_data_quality(db)
+            self._run_assoc_rules(db)
             self.logger.info("Update complete: %d new batches ingested", inserted)
         finally:
             db.close()
@@ -78,6 +80,32 @@ class PipelineRunner:
             self.logger.info("Computed DQ for batch %s", batch_id)
         if batches_without_dq:
             self.logger.info("Data quality: %d batches updated", len(batches_without_dq))
+
+    def _run_assoc_rules(self, db: Database) -> None:
+        exclude = {
+            get_nested(self.config, "data", "time_column", default="INSR_BEGIN"),
+            get_nested(self.config, "data", "target_column", default="CLAIM_PAID"),
+        }
+        batches_without_rules = db.fetchall(
+            """
+            SELECT batch_id
+            FROM raw_batches
+            WHERE batch_id NOT IN (
+                SELECT DISTINCT batch_id
+                FROM assoc_rules
+            )
+            """
+        )
+        for row in batches_without_rules:
+            batch_id = row["batch_id"]
+            df = load_batch(db, batch_id)
+            rules = compute_assoc_rules(df, exclude_columns=exclude)
+            save_assoc_rules(db, batch_id, rules)
+            self.logger.info("Computed association rules for batch %s: %d rules", batch_id, len(rules))
+        if batches_without_rules:
+            self.logger.info(
+                "Association rules: %d batches updated", len(batches_without_rules)
+            )
 
     def run_inference(self, file_path: str | None) -> None:
         if file_path is None:

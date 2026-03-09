@@ -1,5 +1,3 @@
-"""Configuration loader for the MLOps pipeline."""
-
 from pathlib import Path
 from typing import Any
 

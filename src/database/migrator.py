@@ -1,13 +1,13 @@
 """Schema migration runner.
 
-Migrations are plain .sql files in the ``migrations/`` directory,
+Migrations are plain .sql files in the migrations/ directory,
 named with a numeric prefix that determines execution order:
 
     001_create_raw_batches.sql
     002_create_data_quality.sql
     ...
 
-The migrator tracks applied migrations in a ``_migrations`` meta-table
+The migrator tracks applied migrations in a _migrations meta-table
 and only runs new ones.
 """
 
@@ -19,7 +19,6 @@ _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
 
 class Migrator:
-    """Apply SQL migration files to a Database instance."""
 
     def __init__(self, db: Database, migrations_dir: Path | None = None) -> None:
         self._db = db
@@ -45,7 +44,6 @@ class Migrator:
         return [f for f in files if f.name not in applied]
 
     def migrate(self) -> list[str]:
-        """Run all pending migrations. Returns list of applied names."""
         self._ensure_meta_table()
         pending = self._pending()
         applied: list[str] = []
@@ -63,7 +61,6 @@ class Migrator:
         return applied
 
     def status(self) -> dict[str, bool]:
-        """Return {filename: is_applied} for all migration files."""
         self._ensure_meta_table()
         applied = self._applied()
         files = sorted(self._dir.glob("*.sql"))

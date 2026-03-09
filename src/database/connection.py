@@ -1,12 +1,10 @@
-"""SQLite connection manager."""
-
 import sqlite3
 from pathlib import Path
 
 
 class Database:
 
-    def __init__(self, db_path: str = "storage/mlops.sqlite") -> None:
+    def __init__(self, db_path: str) -> None:
         self._db_path = db_path
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn: sqlite3.Connection | None = None

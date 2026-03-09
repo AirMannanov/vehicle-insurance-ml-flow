@@ -3,9 +3,9 @@
 import argparse
 import sys
 
-from src.config import load_config, get_nested
-from src.database import Database, Migrator
-from src.logger import setup_logger
+from src.tools import load_config, get_nested, setup_logger
+from src.data.bootstrap import seed_from_kaggle
+from src.database import Database, Migrator, reset_db
 
 
 def parse_args() -> argparse.Namespace:
@@ -16,8 +16,8 @@ def parse_args() -> argparse.Namespace:
         "-mode",
         type=str,
         required=True,
-        choices=["inference", "update", "summary"],
-        help="Operation mode: inference | update | summary",
+        choices=["inference", "update", "reset-db"],
+        help="Operation mode: inference | update | reset-db",
     )
     parser.add_argument(
         "-file",
@@ -34,50 +34,32 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_update(config: dict, db: Database) -> None:
-    from src.data.loader import download_dataset, load_all_csv
-    from src.data.batch_generator import generate_batches
-    from src.data.storage import save_all_batches
-
-    import logging
-    logger = logging.getLogger("mlops")
-
-    raw_dir = get_nested(config, "data", "raw_dir", default="data")
-    time_col = get_nested(config, "data", "time_column", default="INSR_BEGIN")
-
-    data_dir = download_dataset(dest_dir=raw_dir)
-    df = load_all_csv(data_dir)
-
-    batches = generate_batches(df, time_column=time_col)
-    inserted = save_all_batches(db, batches)
-
-    logger.info("Update complete: %d new batches ingested", inserted)
-
-
 def main() -> None:
     args = parse_args()
     config = load_config(args.config)
     logger = setup_logger(config)
 
+    if args.mode == "reset-db":
+        reset_db(config)
+        return
+
     db_path = get_nested(config, "storage", "db_path", default="storage/mlops.sqlite")
     db = Database(db_path)
-    applied = Migrator(db).migrate()
-    for name in applied:
-        logger.info(f"Applied migration: {name}")
 
-    logger.info(f"Starting pipeline in '{args.mode}' mode")
+    if args.mode == "update":
+        for name in Migrator(db).migrate():
+            logger.info("Applied migration: %s", name)
+        inserted = seed_from_kaggle(config, db)
+        logger.info("Update complete: %d new batches ingested", inserted)
+        db.close()
+        return
 
+    logger.info("Starting pipeline in '%s' mode", args.mode)
     if args.mode == "inference":
         if args.file is None:
             logger.error("Inference mode requires -file argument")
             sys.exit(1)
         raise NotImplementedError("Inference mode not yet implemented")
-
-    elif args.mode == "update":
-        run_update(config, db)
-
-    elif args.mode == "summary":
-        raise NotImplementedError("Summary mode not yet implemented")
 
     db.close()
 

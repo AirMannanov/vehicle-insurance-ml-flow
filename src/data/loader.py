@@ -1,5 +1,3 @@
-"""Dataset download and CSV loading."""
-
 import logging
 import shutil
 from pathlib import Path
@@ -12,17 +10,18 @@ logger = logging.getLogger("mlops")
 KAGGLE_DATASET = "imtkaggleteam/vehicle-insurance-data"
 
 
-def download_dataset(dest_dir: str = "data") -> Path:
-    """Download dataset via kagglehub and copy CSV files to *dest_dir*.
+def download_dataset(dest_dir: str = "data", force_download: bool = False) -> Path:
+    """Download dataset via kagglehub and copy CSV files to dest_dir.
 
     Returns the directory path containing the CSV files.
-    If CSV files already exist in *dest_dir*, the download is skipped.
+    If CSV files already exist in dest_dir, the download is skipped
+    unless force_download=True (use for temporary directories).
     """
     dest = Path(dest_dir)
     dest.mkdir(parents=True, exist_ok=True)
 
     existing = list(dest.glob("*.csv"))
-    if existing:
+    if existing and not force_download:
         logger.info("CSV already present in %s, skipping download", dest)
         return dest
 

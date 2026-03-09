@@ -1,11 +1,9 @@
-"""Logging configuration for the MLOps pipeline."""
-
 import logging
 import sys
 from pathlib import Path
 from typing import Any
 
-from src.config import get_nested
+from src.tools.config import get_nested
 
 
 def setup_logger(

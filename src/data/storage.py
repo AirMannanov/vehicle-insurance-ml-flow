@@ -1,5 +1,3 @@
-"""Batch persistence: metadata → raw_batches, rows → raw_data."""
-
 import json
 import logging
 
@@ -38,11 +36,12 @@ def save_batch(db: Database, batch_id: str, df: pd.DataFrame) -> bool:
 def save_all_batches(
     db: Database, batches: list[tuple[str, pd.DataFrame]]
 ) -> int:
-    """Save a list of (batch_id, DataFrame) pairs. Returns count of newly inserted."""
     inserted = 0
     for batch_id, df in batches:
         if save_batch(db, batch_id, df):
             inserted += 1
+        else:
+            logger.warning("Batch %s already exists in raw_batches", batch_id)
 
     total = db.execute("SELECT COUNT(*) FROM raw_batches").fetchone()[0]
     logger.info("Saved %d new batches (total in DB: %d)", inserted, total)
@@ -50,7 +49,6 @@ def save_all_batches(
 
 
 def load_batch(db: Database, batch_id: str) -> pd.DataFrame:
-    """Load a batch from raw_data back into a DataFrame."""
     rows = db.fetchall(
         "SELECT row_json FROM raw_data WHERE batch_id = ?", (batch_id,)
     )
@@ -60,5 +58,4 @@ def load_batch(db: Database, batch_id: str) -> pd.DataFrame:
 
 
 def list_batches(db: Database) -> list[dict]:
-    """Return all batch metadata records."""
     return db.fetchall("SELECT * FROM raw_batches ORDER BY batch_id")

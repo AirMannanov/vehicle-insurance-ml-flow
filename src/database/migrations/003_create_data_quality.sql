@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS data_quality (
     feature      TEXT    NOT NULL,
     missing_rate REAL    NOT NULL,
     unique_count INTEGER NOT NULL,
+    value_type   TEXT    NOT NULL CHECK (value_type IN ('numeric', 'categorical')),
     stats_json   TEXT,
     UNIQUE(batch_id, feature)
 );

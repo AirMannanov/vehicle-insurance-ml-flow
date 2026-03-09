@@ -10,6 +10,7 @@ from src.analysis.association_rules import (
     save_assoc_rules,
 )
 from src.analysis.cleaning import clean_batch
+from src.analysis.dq_report import write_report
 
 __all__ = [
     "DQRow",
@@ -20,4 +21,5 @@ __all__ = [
     "compute_assoc_rules",
     "save_assoc_rules",
     "clean_batch",
+    "write_report",
 ]

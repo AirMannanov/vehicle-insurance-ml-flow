@@ -8,6 +8,9 @@ cleaning:
   min_unique_ratio: 0.10
   max_unique_ratio: 0.90
 
+report:
+  dq_path: "reports/dq_report.md"
+
 storage:
   db_path: "storage/mlops.sqlite"
 

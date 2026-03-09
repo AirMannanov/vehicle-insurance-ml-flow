@@ -10,6 +10,7 @@ from src.data.bootstrap import seed_from_kaggle
 from src.data.storage import load_batch
 from src.analysis.data_quality import compute_batch_dq, save_batch_dq
 from src.analysis.association_rules import compute_assoc_rules, save_assoc_rules
+from src.analysis.dq_report import write_report
 from src.database import Database, Migrator, reset_db
 
 
@@ -21,8 +22,8 @@ def parse_args() -> argparse.Namespace:
         "-mode",
         type=str,
         required=True,
-        choices=["inference", "update", "reset-db"],
-        help="Operation mode: inference | update | reset-db",
+        choices=["inference", "update", "reset-db", "report"],
+        help="Operation mode: inference | update | reset-db | report",
     )
     parser.add_argument(
         "-file",
@@ -107,6 +108,20 @@ class PipelineRunner:
                 "Association rules: %d batches updated", len(batches_without_rules)
             )
 
+    def run_report(self) -> None:
+        db_path = get_nested(
+            self.config, "storage", "db_path", default="storage/mlops.sqlite"
+        )
+        db = Database(db_path)
+        try:
+            report_path = get_nested(
+                self.config, "report", "dq_path", default="reports/dq_report.md"
+            )
+            path = write_report(db, report_path)
+            self.logger.info("Report saved: %s", path)
+        finally:
+            db.close()
+
     def run_inference(self, file_path: str | None) -> None:
         if file_path is None:
             self.logger.error("Inference mode requires -file argument")
@@ -133,6 +148,9 @@ def main() -> None:
         return
     if args.mode == "update":
         runner.run_update()
+        return
+    if args.mode == "report":
+        runner.run_report()
         return
     if args.mode == "inference":
         runner.run_inference(args.file)

@@ -48,11 +48,11 @@ def _binarize_df(
             is_cat = False
         if is_cat:
             dummies = pd.get_dummies(df[[col]], prefix=col, prefix_sep="=")
-            dummies = (dummies == 1).astype(int)
+            dummies = (dummies == 1).astype(bool)
             out.append(dummies)
         else:
             median_val = df[col].median()
-            above = (df[col] > median_val).fillna(False).astype(int)
+            above = (df[col] > median_val).fillna(False).astype(bool)
             above.name = f"{col}=above_median"
             out.append(pd.DataFrame({above.name: above}))
     if not out:

@@ -3,6 +3,11 @@ data:
   time_column: "INSR_BEGIN"
   target_column: "CLAIM_PAID"
 
+cleaning:
+  max_missing_rate: 0.5
+  min_unique_ratio: 0.10
+  max_unique_ratio: 0.90
+
 storage:
   db_path: "storage/mlops.sqlite"
 

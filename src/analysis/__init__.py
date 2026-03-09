@@ -9,6 +9,7 @@ from src.analysis.association_rules import (
     compute_assoc_rules,
     save_assoc_rules,
 )
+from src.analysis.cleaning import clean_batch
 
 __all__ = [
     "DQRow",
@@ -18,4 +19,5 @@ __all__ = [
     "AssocRule",
     "compute_assoc_rules",
     "save_assoc_rules",
+    "clean_batch",
 ]

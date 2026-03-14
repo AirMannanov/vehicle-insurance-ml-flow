@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from src.database.connection import Database
-from src.database.dataset_schema import ValueType, get_value_type
+from src.database.dataset_schema import FeatureType, get_feature_type
 
 logger = logging.getLogger("mlops")
 
@@ -16,7 +16,7 @@ class DQRow:
     feature: str
     missing_rate: float
     unique_count: int
-    value_type: ValueType
+    value_type: FeatureType
     stats_json: str | None
 
 
@@ -24,16 +24,16 @@ def compute_batch_dq(df: pd.DataFrame) -> list[DQRow]:
     """Compute data quality metrics for each column of the batch.
 
     Returns a list of DQRow. stats_json: for numeric — min, max, mean, std;
-    for categorical — top 10 value counts (JSON string). Uses dataset schema (get_value_type).
+    for categorical — top 10 value counts (JSON string). Uses dataset schema (get_feature_type).
     """
     rows = []
     for col in df.columns:
         s = df[col]
         missing_rate = float(s.isna().mean())
         unique_count = int(s.nunique())
-        value_type: ValueType = get_value_type(col)
+        value_type = get_feature_type(col)
 
-        if value_type == "numeric":
+        if value_type == FeatureType.NUMERIC:
             valid = s.dropna()
             if len(valid) == 0:
                 stats = {}

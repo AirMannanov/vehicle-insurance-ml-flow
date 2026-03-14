@@ -8,6 +8,14 @@ cleaning:
   min_unique_ratio: 0.10
   max_unique_ratio: 0.90
 
+# Preprocessing for MLP: imputation, encoding, scaling. Column lists can be
+# derived from dataset_schema (time/target excluded); optional overrides below.
+preprocessing:
+  scaler: "standard"   # standard | minmax
+  # Optional: set to override schema-derived lists (e.g. for different train data)
+  # numeric_features: []
+  # categorical_features: []
+
 report:
   dq_path: "reports/dq_report.md"
 

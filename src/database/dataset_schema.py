@@ -1,34 +1,36 @@
-from typing import Literal
+from enum import StrEnum
 
-ValueType = Literal["numeric", "categorical"]
 
-COLUMN_TYPES: dict[str, ValueType] = {
-    "SEX": "categorical",
-    "INSR_BEGIN": "categorical",
-    "INSR_END": "categorical",
-    "EFFECTIVE_YR": "categorical",
-    "INSR_TYPE": "categorical",
-    "INSURED_VALUE": "numeric",
-    "PREMIUM": "numeric",
-    "OBJECT_ID": "numeric",
-    "PROD_YEAR": "numeric",
-    "SEATS_NUM": "numeric",
-    "CARRYING_CAPACITY": "numeric",
-    "TYPE_VEHICLE": "categorical",
-    "CCM_TON": "numeric",
-    "MAKE": "categorical",
-    "USAGE": "categorical",
-    "CLAIM_PAID": "numeric",
+class FeatureType(StrEnum):
+    NUMERIC = "numeric"
+    CATEGORICAL = "categorical"
+
+
+_COLUMN_TYPES: dict[str, FeatureType] = {
+    "SEX": FeatureType.CATEGORICAL,
+    "INSR_BEGIN": FeatureType.CATEGORICAL,
+    "INSR_END": FeatureType.CATEGORICAL,
+    "EFFECTIVE_YR": FeatureType.CATEGORICAL,
+    "INSR_TYPE": FeatureType.CATEGORICAL,
+    "INSURED_VALUE": FeatureType.NUMERIC,
+    "PREMIUM": FeatureType.NUMERIC,
+    "OBJECT_ID": FeatureType.NUMERIC,
+    "PROD_YEAR": FeatureType.NUMERIC,
+    "SEATS_NUM": FeatureType.NUMERIC,
+    "CARRYING_CAPACITY": FeatureType.NUMERIC,
+    "TYPE_VEHICLE": FeatureType.CATEGORICAL,
+    "CCM_TON": FeatureType.NUMERIC,
+    "MAKE": FeatureType.CATEGORICAL,
+    "USAGE": FeatureType.CATEGORICAL,
+    "CLAIM_PAID": FeatureType.NUMERIC,
 }
 
 
-def is_categorical(column: str) -> bool:
-    if column not in COLUMN_TYPES:
-        raise ValueError(f"Column {column} not found in COLUMN_TYPES")
-    return COLUMN_TYPES[column] == "categorical"
+def column_in_schema(column: str) -> bool:
+    return column in _COLUMN_TYPES
 
 
-def get_value_type(column: str) -> ValueType:
-    if column not in COLUMN_TYPES:
-        raise ValueError(f"Column {column} not found in COLUMN_TYPES")
-    return COLUMN_TYPES[column]
+def get_feature_type(column: str) -> FeatureType:
+    if column not in _COLUMN_TYPES:
+        raise ValueError(f"Column {column} not found in dataset schema")
+    return _COLUMN_TYPES[column]

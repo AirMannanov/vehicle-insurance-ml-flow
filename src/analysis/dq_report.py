@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from src.database.connection import Database
-from src.database.dataset_schema import COLUMN_TYPES, get_value_type
+from src.database.dataset_schema import FeatureType, column_in_schema, get_feature_type
 from src.data.storage import load_batch, list_batches
 
 logger = logging.getLogger("mlops")
@@ -28,11 +28,17 @@ def _load_eda_data(db: Database) -> pd.DataFrame:
 
 
 def _eda_numeric_columns(df: pd.DataFrame) -> list[str]:
-    return [c for c in df.columns if c != "_batch_id" and get_value_type(c) == "numeric"]
+    return [
+        c for c in df.columns
+        if c != "_batch_id" and column_in_schema(c) and get_feature_type(c) == FeatureType.NUMERIC
+    ]
 
 
 def _eda_categorical_columns(df: pd.DataFrame) -> list[str]:
-    return [c for c in df.columns if c != "_batch_id" and get_value_type(c) == "categorical"]
+    return [
+        c for c in df.columns
+        if c != "_batch_id" and column_in_schema(c) and get_feature_type(c) == FeatureType.CATEGORICAL
+    ]
 
 
 def _plot_correlation_heatmap(df: pd.DataFrame, output_path: Path) -> None:
@@ -103,7 +109,7 @@ def _build_eda_md_content(df: pd.DataFrame, figures_rel: Path) -> str:
     num_cols = _eda_numeric_columns(df)
     cat_cols = _eda_categorical_columns(df)
     n_rows = len(df)
-    n_cols = len([c for c in df.columns if c in COLUMN_TYPES])
+    n_cols = len([c for c in df.columns if column_in_schema(c)])
 
     lines = [
         "# Automatic EDA",
@@ -119,12 +125,12 @@ def _build_eda_md_content(df: pd.DataFrame, figures_rel: Path) -> str:
         "|--------|------|-----------|---------------|",
     ]
     for col in df.columns:
-        if col not in COLUMN_TYPES:
+        if not column_in_schema(col):
             continue
         s = df[col]
         missing_pct = 100.0 * s.isna().mean()
         n_unique = s.nunique()
-        dtype = get_value_type(col)
+        dtype = get_feature_type(col)
         lines.append(_md_table_row([col, dtype, f"{missing_pct:.2f}%", n_unique]))
     lines.append("")
 

@@ -1,6 +1,5 @@
 from src.analysis.data_quality import (
     DQRow,
-    ValueType,
     compute_batch_dq,
     save_batch_dq,
 )
@@ -11,10 +10,11 @@ from src.analysis.association_rules import (
 )
 from src.analysis.cleaning import clean_batch
 from src.analysis.dq_report import write_report
+from src.database.dataset_schema import FeatureType
 
 __all__ = [
     "DQRow",
-    "ValueType",
+    "FeatureType",
     "compute_batch_dq",
     "save_batch_dq",
     "AssocRule",

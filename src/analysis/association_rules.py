@@ -6,7 +6,7 @@ import pandas as pd
 from mlxtend.frequent_patterns import apriori, association_rules
 
 from src.database.connection import Database
-from src.database.dataset_schema import get_value_type
+from src.database.dataset_schema import FeatureType, get_feature_type
 
 logger = logging.getLogger("mlops")
 
@@ -32,7 +32,7 @@ def _binarize_df(
 ) -> pd.DataFrame:
     """Convert batch DataFrame to binary matrix for Apriori.
 
-    Uses dataset schema (get_value_type): categorical -> one-hot, numeric -> median split.
+    Uses dataset schema (get_feature_type): categorical -> one-hot, numeric -> median split.
     Unknown columns are treated as numeric. Columns in exclude_columns are dropped.
     """
     out = []
@@ -43,7 +43,7 @@ def _binarize_df(
         if len(s) == 0:
             continue
         try:
-            is_cat = get_value_type(col) == "categorical"
+            is_cat = get_feature_type(col) == FeatureType.CATEGORICAL
         except ValueError:
             is_cat = False
         if is_cat:

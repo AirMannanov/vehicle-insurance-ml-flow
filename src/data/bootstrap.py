@@ -24,5 +24,5 @@ def seed_from_kaggle(config: dict[str, Any], db: Database) -> int:
         download_dataset(dest_dir=tmp_dir, force_download=True)
         df = load_all_csv(tmp_dir)
         batches = generate_batches(df, time_column=time_col)
-        inserted = save_all_batches(db, batches)
+        inserted = save_all_batches(db, batches, time_column=time_col)
     return inserted

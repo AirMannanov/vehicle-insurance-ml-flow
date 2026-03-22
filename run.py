@@ -1,9 +1,14 @@
 """CLI entry point for the MLOps pipeline."""
 
 import argparse
+import json
 import logging
 import sys
+from pathlib import Path
 from typing import Any
+
+import numpy as np
+import pandas as pd
 
 from src.tools import get_nested, load_config, setup_logger
 from src.data.bootstrap import seed_from_kaggle
@@ -12,9 +17,14 @@ from src.analysis.data_quality import compute_batch_dq, save_batch_dq
 from src.analysis.association_rules import compute_assoc_rules, save_assoc_rules
 from src.analysis.dq_report import write_report
 from src.database import Database, Migrator, reset_project_outputs
-from src.database.model_validation_runs import list_model_validation_runs
+from src.database.model_validation_runs import (
+    ModelValidationRunRecord,
+    list_model_validation_runs,
+)
 from src.models import train_models
+from src.preprocessing.transformers import ensure_feature_columns
 from src.reporting import write_model_report
+from src.serving import load_model_bundle
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,8 +35,8 @@ def parse_args() -> argparse.Namespace:
         "-mode",
         type=str,
         required=True,
-        choices=["inference", "update", "reset", "report", "train"],
-        help="Operation mode: inference | update | reset | report | train",
+        choices=["inference", "update", "reset", "summary", "train"],
+        help="Operation mode: inference | update | reset | summary | train",
     )
     parser.add_argument(
         "-file",
@@ -128,12 +138,13 @@ class PipelineRunner:
                 "Association rules: %d batches updated", len(batches_without_rules)
             )
 
-    def run_report(self) -> None:
+    def run_summary(self) -> None:
         db_path = get_nested(
             self.config, "storage", "db_path", default="storage/mlops.sqlite"
         )
         db = Database(db_path)
         try:
+            self._ensure_no_pending_migrations(db, mode="summary")
             report_path = get_nested(
                 self.config, "report", "dq_path", default="reports/dq_report.md"
             )
@@ -146,15 +157,98 @@ class PipelineRunner:
         if file_path is None:
             self.logger.error("Inference mode requires -file argument")
             sys.exit(1)
+        input_path = Path(file_path)
+        if not input_path.exists():
+            raise FileNotFoundError(f"Inference file not found: {input_path}")
         db_path = get_nested(
             self.config, "storage", "db_path", default="storage/mlops.sqlite"
         )
         db = Database(db_path)
         try:
+            self._ensure_no_pending_migrations(db, mode="inference")
             self.logger.info("Starting pipeline in 'inference' mode")
-            raise NotImplementedError("Inference mode not yet implemented")
+            record = self._get_best_selected_validation_run(db)
+            bundle = load_model_bundle(record.artifact_path)
+            input_df = pd.read_csv(input_path)
+            output_df = self._predict_with_bundle(input_df, bundle)
+            output_path = input_path.with_name(f"{input_path.stem}_predictions.csv")
+            output_df.to_csv(output_path, index=False)
+            self.logger.info(
+                "Inference complete: model=%s validation_run_id=%s output=%s",
+                record.model_name,
+                record.validation_run_id,
+                output_path,
+            )
         finally:
             db.close()
+
+    def _get_best_selected_validation_run(
+        self,
+        db: Database,
+    ) -> ModelValidationRunRecord:
+        selected_records = [
+            record for record in list_model_validation_runs(db) if record.is_selected
+        ]
+        if not selected_records:
+            raise RuntimeError(
+                "Inference requires at least one selected model. Run train mode first."
+            )
+
+        primary_metric = "f1"
+        return max(
+            selected_records,
+            key=lambda record: float(
+                json.loads(record.validation_metrics_json).get(primary_metric, float("-inf"))
+            ),
+        )
+
+    def _predict_with_bundle(
+        self,
+        df: pd.DataFrame,
+        bundle: dict[str, Any],
+    ) -> pd.DataFrame:
+        model_name = bundle["model_name"]
+        model = bundle["model"]
+        feature_spec = bundle.get("feature_spec", {})
+        training_metadata = bundle.get("training_metadata", {})
+        threshold = float(training_metadata.get("threshold", 0.5))
+
+        feature_columns = list(feature_spec.get("feature_columns", []))
+        numeric_features = list(feature_spec.get("numeric_features", []))
+        categorical_features = list(feature_spec.get("categorical_features", []))
+        dropped_columns = list(feature_spec.get("dropped_columns", []))
+
+        prepared_df = df.drop(columns=dropped_columns, errors="ignore").copy()
+        prepared_df = ensure_feature_columns(
+            prepared_df,
+            numeric_features,
+            categorical_features,
+        )
+
+        if model_name == "mlp":
+            preprocessor = bundle.get("preprocessor")
+            if preprocessor is None:
+                raise RuntimeError("MLP inference requires a fitted preprocessor in the model bundle")
+            X = preprocessor.transform(prepared_df)
+        elif model_name == "catboost":
+            X = prepared_df[feature_columns].copy()
+            for column in categorical_features:
+                if column not in X.columns:
+                    continue
+                X[column] = X[column].where(X[column].notna(), "missing").astype(str)
+        else:
+            raise ValueError(f"Unsupported model_name in artifact bundle: {model_name!r}")
+
+        if hasattr(model, "predict_proba"):
+            probabilities = np.asarray(model.predict_proba(X)[:, 1], dtype=float)
+        else:
+            probabilities = np.asarray(model.predict(X), dtype=float)
+
+        predictions = (probabilities >= threshold).astype(int)
+        output_df = df.copy()
+        output_df["predict_proba"] = probabilities
+        output_df["predict"] = predictions
+        return output_df
 
     def run_train(self, train_config_path: str) -> None:
         self.logger.info("Starting pipeline in 'train' mode")
@@ -196,8 +290,8 @@ def main() -> None:
     if args.mode == "update":
         runner.run_update()
         return
-    if args.mode == "report":
-        runner.run_report()
+    if args.mode == "summary":
+        runner.run_summary()
         return
     if args.mode == "inference":
         runner.run_inference(args.file)

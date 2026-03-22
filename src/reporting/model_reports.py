@@ -30,14 +30,18 @@ def write_model_report(
     report_dir.mkdir(parents=True, exist_ok=True)
     figures_path.mkdir(parents=True, exist_ok=True)
 
-    chart_path = figures_path / f"{record.model_name}_validation_run_{record.validation_run_id}.png"
+    report_stem = _build_report_stem(
+        record.model_name,
+        validation_run_id=record.validation_run_id,
+    )
+    chart_path = figures_path / f"{report_stem}.png"
     _write_metrics_chart(
         validation_metrics=validation_metrics,
         test_metrics=test_metrics,
         output_path=chart_path,
     )
 
-    report_path = report_dir / f"{record.model_name}_validation_run_{record.validation_run_id}.md"
+    report_path = report_dir / f"{report_stem}.md"
     chart_rel_path = Path("..") / "figures" / "models" / chart_path.name
     report_content = _build_report_content(
         record=record,
@@ -51,6 +55,14 @@ def write_model_report(
     )
     report_path.write_text(report_content, encoding="utf-8")
     return str(report_path)
+
+
+def _build_report_stem(
+    model_name: str,
+    *,
+    validation_run_id: int,
+) -> str:
+    return f"model_report_{model_name}_v{validation_run_id}"
 
 
 def _write_metrics_chart(
@@ -97,6 +109,7 @@ def _build_report_content(
         "",
         "## Summary",
         "",
+        f"- **Model version:** v{record.validation_run_id}",
         f"- **Validation run id:** {record.validation_run_id}",
         f"- **Model family:** {record.model_name}",
         f"- **Selected:** {'yes' if record.is_selected else 'no'}",

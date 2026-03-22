@@ -22,7 +22,12 @@ from src.models.training_dataset import select_training_dates
 from src.preprocessing import prepare_features_for_catboost, prepare_features_for_mlp
 from src.serving import save_model_bundle
 from src.tools import get_nested
-from src.validation import SplitConfig, build_split_from_dates, evaluate_model_dataframe, evaluate_model_test_batches
+from src.validation import (
+    SplitConfig,
+    build_split_from_dates,
+    evaluate_model_test_batches,
+    select_best_threshold,
+)
 
 logger = logging.getLogger("mlops")
 
@@ -70,6 +75,7 @@ def train_models(
         default="artifacts/models",
     )
     primary_metric = get_nested(train_config, "validation", "primary_metric", default="f1")
+    candidate_thresholds = _get_candidate_thresholds(train_config)
 
     results: list[TrainResult] = []
     for model_name in enabled_models:
@@ -86,6 +92,7 @@ def train_models(
                     split_config=split_config,
                     artifacts_dir=artifacts_dir,
                     primary_metric=primary_metric,
+                    candidate_thresholds=candidate_thresholds,
                 )
             )
             continue
@@ -103,6 +110,7 @@ def train_models(
                     split_config=split_config,
                     artifacts_dir=artifacts_dir,
                     primary_metric=primary_metric,
+                    candidate_thresholds=candidate_thresholds,
                 )
             )
             continue
@@ -124,6 +132,7 @@ def _train_evaluate_select_mlp(
     split_config: SplitConfig,
     artifacts_dir: str,
     primary_metric: str,
+    candidate_thresholds: list[float],
 ) -> TrainResult:
     hyperparameters = (get_nested(train_config, "mlp", default={}) or {}).copy()
     prepared = prepare_features_for_mlp(
@@ -135,13 +144,15 @@ def _train_evaluate_select_mlp(
     model = MLPClassifier(**hyperparameters)
     model.fit(prepared.X, prepared.y)
 
-    validation_metrics = evaluate_model_dataframe(
+    best_threshold, validation_metrics = select_best_threshold(
         "mlp",
         model=model,
         preprocessor=prepared.preprocessor,
         df=val_df,
         base_config=base_config,
         cleaning_plan=cleaning_plan,
+        candidate_thresholds=candidate_thresholds,
+        primary_metric=primary_metric,
     )
     _batch_results, test_metrics = evaluate_model_test_batches(
         db,
@@ -151,6 +162,7 @@ def _train_evaluate_select_mlp(
         test_dates=split_result.test_dates,
         base_config=base_config,
         cleaning_plan=cleaning_plan,
+        threshold=best_threshold,
     )
     feature_spec = _build_feature_spec(
         base_config,
@@ -167,6 +179,7 @@ def _train_evaluate_select_mlp(
         split_result=split_result,
         hyperparameters=hyperparameters,
         train_rows=len(train_df),
+        threshold=best_threshold,
         validation_metrics=validation_metrics,
         test_metrics=test_metrics,
     )
@@ -178,7 +191,7 @@ def _train_evaluate_select_mlp(
         hyperparameters=hyperparameters,
         feature_spec=feature_spec,
         validation_metrics=validation_metrics,
-        split_config=_serialize_split_config(split_config),
+        split_config=_serialize_split_config(split_config, threshold=best_threshold),
     )
     update_model_validation_run_test_metrics(
         db,
@@ -221,6 +234,7 @@ def _train_evaluate_select_catboost(
     split_config: SplitConfig,
     artifacts_dir: str,
     primary_metric: str,
+    candidate_thresholds: list[float],
 ) -> TrainResult:
     hyperparameters = (get_nested(train_config, "catboost", default={}) or {}).copy()
     hyperparameters.setdefault("allow_writing_files", False)
@@ -236,13 +250,15 @@ def _train_evaluate_select_catboost(
         cat_features=prepared.categorical_features,
     )
 
-    validation_metrics = evaluate_model_dataframe(
+    best_threshold, validation_metrics = select_best_threshold(
         "catboost",
         model=model,
         preprocessor=None,
         df=val_df,
         base_config=base_config,
         cleaning_plan=cleaning_plan,
+        candidate_thresholds=candidate_thresholds,
+        primary_metric=primary_metric,
     )
     _batch_results, test_metrics = evaluate_model_test_batches(
         db,
@@ -252,6 +268,7 @@ def _train_evaluate_select_catboost(
         test_dates=split_result.test_dates,
         base_config=base_config,
         cleaning_plan=cleaning_plan,
+        threshold=best_threshold,
     )
     feature_spec = _build_feature_spec(
         base_config,
@@ -268,6 +285,7 @@ def _train_evaluate_select_catboost(
         split_result=split_result,
         hyperparameters=hyperparameters,
         train_rows=len(train_df),
+        threshold=best_threshold,
         validation_metrics=validation_metrics,
         test_metrics=test_metrics,
     )
@@ -279,7 +297,7 @@ def _train_evaluate_select_catboost(
         hyperparameters=hyperparameters,
         feature_spec=feature_spec,
         validation_metrics=validation_metrics,
-        split_config=_serialize_split_config(split_config),
+        split_config=_serialize_split_config(split_config, threshold=best_threshold),
     )
     update_model_validation_run_test_metrics(
         db,
@@ -317,12 +335,20 @@ def _build_training_cleaning_plan(
     time_column = get_nested(base_config, "data", "time_column", default="INSR_BEGIN")
     target_column = get_nested(base_config, "data", "target_column", default="CLAIM_PAID")
     feature_df = df.drop(columns=[time_column, target_column], errors="ignore")
-    return build_cleaning_plan(
+    cleaning_plan = build_cleaning_plan(
         feature_df,
         max_missing_rate=get_nested(base_config, "cleaning", "max_missing_rate", default=0.5),
         min_unique_ratio=get_nested(base_config, "cleaning", "min_unique_ratio", default=0.10),
         max_unique_ratio=get_nested(base_config, "cleaning", "max_unique_ratio", default=0.90),
     )
+    forced_drop_columns = get_nested(
+        base_config,
+        "cleaning",
+        "forced_drop_columns",
+        default=["OBJECT_ID"],
+    ) or []
+    dropped_columns = sorted(set(cleaning_plan.dropped_columns) | set(forced_drop_columns))
+    return CleaningPlan(dropped_columns=dropped_columns)
 
 
 def _get_split_config(train_config: dict[str, Any]) -> SplitConfig:
@@ -333,14 +359,26 @@ def _get_split_config(train_config: dict[str, Any]) -> SplitConfig:
     )
 
 
-def _serialize_split_config(split_config: SplitConfig) -> dict[str, Any]:
+def _serialize_split_config(
+    split_config: SplitConfig,
+    *,
+    threshold: float,
+) -> dict[str, Any]:
     return {
         "train_ratio": split_config.train_ratio,
         "val_ratio": split_config.val_ratio,
         "test_ratio": split_config.test_ratio,
         "time_granularity": split_config.time_granularity,
         "min_unique_periods": split_config.min_unique_periods,
+        "threshold": threshold,
     }
+
+
+def _get_candidate_thresholds(train_config: dict[str, Any]) -> list[float]:
+    thresholds = get_nested(train_config, "validation", "candidate_thresholds")
+    if thresholds:
+        return [float(value) for value in thresholds]
+    return [0.05, 0.08, 0.10, 0.12, 0.15, 0.18, 0.20, 0.22, 0.25, 0.30, 0.35, 0.40, 0.50]
 
 
 def _update_selected_model(
@@ -390,6 +428,7 @@ def _build_artifact_bundle(
     split_result,
     hyperparameters: dict[str, Any],
     train_rows: int,
+    threshold: float,
     validation_metrics: dict[str, Any],
     test_metrics: dict[str, Any],
 ) -> dict[str, Any]:
@@ -404,6 +443,7 @@ def _build_artifact_bundle(
             "train_dates": list(split_result.train_dates),
             "val_dates": list(split_result.val_dates),
             "test_dates": list(split_result.test_dates),
+            "threshold": threshold,
         },
         "validation_metrics": validation_metrics,
         "test_metrics": test_metrics,

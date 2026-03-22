@@ -35,6 +35,10 @@ class CatBoostPreprocessor(Preprocessor):
             self.resolve_feature_columns(prepared_df)
         )
         X = prepared_df[feature_columns].copy()
+        for column in categorical_features:
+            if column not in X.columns:
+                continue
+            X[column] = X[column].where(X[column].notna(), "missing").astype(str)
         dropped_columns = sorted(set(df.columns) - set(prepared_df.columns))
 
         return CatBoostPreparedData(

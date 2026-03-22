@@ -12,7 +12,9 @@ from src.analysis.data_quality import compute_batch_dq, save_batch_dq
 from src.analysis.association_rules import compute_assoc_rules, save_assoc_rules
 from src.analysis.dq_report import write_report
 from src.database import Database, Migrator, reset_project_outputs
+from src.database.model_validation_runs import list_model_validation_runs
 from src.models import train_models
+from src.reporting import write_model_report
 
 
 def parse_args() -> argparse.Namespace:
@@ -171,6 +173,13 @@ class PipelineRunner:
                     result.is_selected,
                     result.artifact_path,
                 )
+                record = next(
+                    record
+                    for record in list_model_validation_runs(db, model_name=result.model_name)
+                    if record.validation_run_id == result.validation_run_id
+                )
+                report_path = write_model_report(record)
+                self.logger.info("Model report saved: %s", report_path)
         finally:
             db.close()
 

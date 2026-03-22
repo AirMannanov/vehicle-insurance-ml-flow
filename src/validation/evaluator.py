@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from src.analysis.cleaning import CleaningPlan
@@ -18,6 +19,45 @@ class BatchEvaluation:
     metrics: dict[str, Any]
 
 
+def select_best_threshold(
+    model_name: str,
+    *,
+    model: Any,
+    preprocessor: Any,
+    df: pd.DataFrame,
+    base_config: dict[str, Any],
+    cleaning_plan: CleaningPlan,
+    candidate_thresholds: list[float],
+    primary_metric: str,
+) -> tuple[float, dict[str, Any]]:
+    prepared = _prepare_for_model(
+        model_name,
+        df=df,
+        base_config=base_config,
+        cleaning_plan=cleaning_plan,
+        preprocessor=preprocessor,
+    )
+    probabilities, latency_ms = _predict_positive_probabilities(model, prepared.X)
+
+    best_threshold = 0.5
+    best_metrics: dict[str, Any] | None = None
+    for threshold in candidate_thresholds:
+        y_pred = apply_threshold(probabilities, threshold)
+        metrics = compute_classification_metrics(
+            prepared.y,
+            y_pred,
+            inference_latency_ms=latency_ms,
+        )
+        metrics["threshold"] = threshold
+        if best_metrics is None or _is_better(metrics, best_metrics, primary_metric):
+            best_threshold = threshold
+            best_metrics = metrics
+
+    if best_metrics is None:
+        raise ValueError("Failed to choose a threshold from candidate_thresholds")
+    return best_threshold, best_metrics
+
+
 def evaluate_model_dataframe(
     model_name: str,
     *,
@@ -26,6 +66,7 @@ def evaluate_model_dataframe(
     df: pd.DataFrame,
     base_config: dict[str, Any],
     cleaning_plan: CleaningPlan,
+    threshold: float = 0.5,
 ) -> dict[str, Any]:
     prepared = _prepare_for_model(
         model_name,
@@ -34,14 +75,15 @@ def evaluate_model_dataframe(
         cleaning_plan=cleaning_plan,
         preprocessor=preprocessor,
     )
-    started = time.perf_counter()
-    y_pred = model.predict(prepared.X)
-    latency_ms = (time.perf_counter() - started) * 1000.0
-    return compute_classification_metrics(
+    probabilities, latency_ms = _predict_positive_probabilities(model, prepared.X)
+    y_pred = apply_threshold(probabilities, threshold)
+    metrics = compute_classification_metrics(
         prepared.y,
         y_pred,
         inference_latency_ms=latency_ms,
     )
+    metrics["threshold"] = threshold
+    return metrics
 
 
 def evaluate_model_test_batches(
@@ -53,6 +95,7 @@ def evaluate_model_test_batches(
     test_dates: list[str],
     base_config: dict[str, Any],
     cleaning_plan: CleaningPlan,
+    threshold: float = 0.5,
 ) -> tuple[list[BatchEvaluation], dict[str, Any]]:
     batch_evaluations: list[BatchEvaluation] = []
     all_y_true: list[Any] = []
@@ -81,14 +124,14 @@ def evaluate_model_test_batches(
             cleaning_plan=cleaning_plan,
             preprocessor=preprocessor,
         )
-        started = time.perf_counter()
-        y_pred = model.predict(prepared.X)
-        latency_ms = (time.perf_counter() - started) * 1000.0
+        probabilities, latency_ms = _predict_positive_probabilities(model, prepared.X)
+        y_pred = apply_threshold(probabilities, threshold)
         metrics = compute_classification_metrics(
             prepared.y,
             y_pred,
             inference_latency_ms=latency_ms,
         )
+        metrics["threshold"] = threshold
         batch_evaluations.append(BatchEvaluation(batch_date=batch_date, metrics=metrics))
         all_y_true.extend(prepared.y.tolist())
         all_y_pred.extend(list(y_pred))
@@ -99,6 +142,7 @@ def evaluate_model_test_batches(
         all_y_pred,
         inference_latency_ms=total_latency_ms,
     )
+    aggregate_metrics["threshold"] = threshold
     return batch_evaluations, aggregate_metrics
 
 
@@ -125,3 +169,39 @@ def _prepare_for_model(
             cleaning_plan=cleaning_plan,
         )
     raise ValueError(f"Unsupported model_name: {model_name!r}")
+
+
+def _predict_positive_probabilities(model: Any, X) -> tuple[np.ndarray, float]:
+    started = time.perf_counter()
+    if hasattr(model, "predict_proba"):
+        probabilities = model.predict_proba(X)[:, 1]
+    else:
+        raw_predictions = np.asarray(model.predict(X))
+        probabilities = raw_predictions.astype(float)
+    latency_ms = (time.perf_counter() - started) * 1000.0
+    return np.asarray(probabilities, dtype=float), latency_ms
+
+
+def apply_threshold(probabilities, threshold: float):
+    probabilities_arr = np.asarray(probabilities, dtype=float)
+    return (probabilities_arr >= threshold).astype(int)
+
+
+def _is_better(
+    candidate_metrics: dict[str, Any],
+    current_metrics: dict[str, Any],
+    primary_metric: str,
+) -> bool:
+    candidate_score = float(candidate_metrics[primary_metric])
+    current_score = float(current_metrics[primary_metric])
+    if candidate_score != current_score:
+        return candidate_score > current_score
+
+    candidate_recall = float(candidate_metrics.get("recall", 0.0))
+    current_recall = float(current_metrics.get("recall", 0.0))
+    if candidate_recall != current_recall:
+        return candidate_recall > current_recall
+
+    candidate_pred_positive = int(candidate_metrics.get("pred_positive_count", 0))
+    current_pred_positive = int(current_metrics.get("pred_positive_count", 0))
+    return candidate_pred_positive > current_pred_positive

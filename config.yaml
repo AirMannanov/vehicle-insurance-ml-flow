@@ -7,6 +7,7 @@ cleaning:
   max_missing_rate: 0.5
   min_unique_ratio: 0.10
   max_unique_ratio: 0.90
+  forced_drop_columns: ["OBJECT_ID"]
 
 # Preprocessing for MLP: imputation, encoding, scaling. Column lists can be
 # derived from dataset_schema (time/target excluded); optional overrides below.

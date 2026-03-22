@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from src.analysis.data_quality import DQRow
+from src.database.dataset_schema import FeatureType, column_in_schema, get_feature_type
 
 logger = logging.getLogger("mlops")
 
@@ -11,6 +12,33 @@ logger = logging.getLogger("mlops")
 @dataclass(slots=True)
 class CleaningPlan:
     dropped_columns: list[str]
+
+
+def _should_drop_for_unique_ratio(
+    column: str,
+    *,
+    unique_ratio: float,
+    min_unique_ratio: float | None,
+    max_unique_ratio: float | None,
+) -> bool:
+    feature_type: FeatureType | None = None
+    if column_in_schema(column):
+        feature_type = get_feature_type(column)
+
+    # Low-cardinality categorical columns are often the most informative
+    # for tabular models, so the lower-bound uniqueness filter applies only
+    # to numeric or unknown columns.
+    if (
+        min_unique_ratio is not None
+        and unique_ratio < min_unique_ratio
+        and feature_type != FeatureType.CATEGORICAL
+    ):
+        return True
+
+    if max_unique_ratio is not None and unique_ratio > max_unique_ratio:
+        return True
+
+    return False
 
 
 def clean_batch(
@@ -47,13 +75,14 @@ def clean_batch(
             logger.debug("Dropping %s: missing_rate %.2f > %.2f", col, row.missing_rate, max_missing_rate)
             continue
         unique_ratio = row.unique_count / n_rows
-        if min_unique_ratio is not None and unique_ratio < min_unique_ratio:
+        if _should_drop_for_unique_ratio(
+            col,
+            unique_ratio=unique_ratio,
+            min_unique_ratio=min_unique_ratio,
+            max_unique_ratio=max_unique_ratio,
+        ):
             to_drop.append(col)
-            logger.debug("Dropping %s: unique_ratio %.4f < %.4f", col, unique_ratio, min_unique_ratio)
-            continue
-        if max_unique_ratio is not None and unique_ratio > max_unique_ratio:
-            to_drop.append(col)
-            logger.debug("Dropping %s: unique_ratio %.4f > %.4f", col, unique_ratio, max_unique_ratio)
+            logger.debug("Dropping %s: unique_ratio %.4f failed thresholds", col, unique_ratio)
 
     keep = [c for c in df.columns if c not in to_drop]
     if to_drop:
@@ -82,10 +111,12 @@ def build_cleaning_plan(
             continue
 
         unique_ratio = float(series.nunique(dropna=True) / n_rows)
-        if min_unique_ratio is not None and unique_ratio < min_unique_ratio:
-            dropped_columns.append(column)
-            continue
-        if max_unique_ratio is not None and unique_ratio > max_unique_ratio:
+        if _should_drop_for_unique_ratio(
+            column,
+            unique_ratio=unique_ratio,
+            min_unique_ratio=min_unique_ratio,
+            max_unique_ratio=max_unique_ratio,
+        ):
             dropped_columns.append(column)
 
     return CleaningPlan(dropped_columns=dropped_columns)

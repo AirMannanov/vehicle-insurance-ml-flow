@@ -2,23 +2,23 @@
 
 ## Summary
 
-- **Model version:** v1
-- **Validation run id:** 1
+- **Model version:** v3
+- **Validation run id:** 3
 - **Model family:** catboost
-- **Selected:** yes
-- **Created at:** 2026-03-22 21:16:03
-- **Artifact path:** `artifacts/models/catboost/20260323_001603.joblib`
+- **Selected:** no
+- **Created at:** 2026-03-22 21:26:47
+- **Artifact path:** `artifacts/models/catboost/20260323_002647.joblib`
 
 ## Metrics
 
 | Split | Accuracy | Precision | Recall | F1 | N samples | Latency ms |
 |-------|----------|-----------|--------|----|-----------|------------|
-| validation | 0.8023 | 0.2052 | 0.5465 | 0.2984 | 140518 | 116.6115 |
-| test | 0.7972 | 0.1538 | 0.5402 | 0.2394 | 147238 | 442.2700 |
+| validation | 0.8023 | 0.2052 | 0.5465 | 0.2984 | 140518 | 104.9137 |
+| test | 0.7972 | 0.1538 | 0.5402 | 0.2394 | 147238 | 432.8828 |
 
 ## Chart
 
-![Validation vs test metrics](../figures/models/model_report_catboost_v1.png)
+![Validation vs test metrics](../figures/models/model_report_catboost_v3.png)
 
 ## Class Balance
 

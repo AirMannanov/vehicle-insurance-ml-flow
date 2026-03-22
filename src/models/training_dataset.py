@@ -3,11 +3,8 @@ from typing import Literal
 
 from src.database import (
     Database,
-    get_all_row_ids,
     get_available_event_dates_for_date_range,
     get_available_event_dates_for_exact_dates,
-    get_row_ids_for_date_range,
-    get_row_ids_for_exact_dates,
     list_available_event_dates,
 )
 from src.tools import get_nested
@@ -36,33 +33,6 @@ def get_train_dataset_config(train_config: dict) -> TrainDatasetConfig:
         end_date=dataset_config.get("end_date"),
         dates=dates,
     )
-
-
-def select_training_row_ids(
-    db: Database,
-    train_config: dict,
-) -> list[int]:
-    dataset_config = get_train_dataset_config(train_config)
-    if dataset_config.selection_mode == "all":
-        return get_all_row_ids(db)
-
-    if dataset_config.selection_mode == "date_range":
-        if dataset_config.start_date is None and dataset_config.end_date is None:
-            return get_all_row_ids(db)
-        if dataset_config.start_date is None or dataset_config.end_date is None:
-            raise ValueError(
-                "dataset.start_date and dataset.end_date must both be set for date_range"
-            )
-        return get_row_ids_for_date_range(
-            db,
-            dataset_config.start_date,
-            dataset_config.end_date,
-        )
-    if not dataset_config.dates:
-        raise ValueError(
-            "dataset.dates must be a non-empty list for selection_mode='exact_dates'"
-        )
-    return get_row_ids_for_exact_dates(db, dataset_config.dates)
 
 
 def select_training_dates(

@@ -1,7 +1,6 @@
 """CLI entry point for the MLOps pipeline."""
 
 import argparse
-import json
 import logging
 import sys
 from pathlib import Path
@@ -16,10 +15,12 @@ from src.data.storage import load_batch
 from src.analysis.data_quality import compute_batch_dq, save_batch_dq
 from src.analysis.association_rules import compute_assoc_rules, save_assoc_rules
 from src.analysis.dq_report import write_report
-from src.database import Database, Migrator, reset_project_outputs
-from src.database.model_validation_runs import (
-    ModelValidationRunRecord,
+from src.database import (
+    Database,
+    Migrator,
+    get_best_selected_model_validation_run,
     list_model_validation_runs,
+    reset_project_outputs,
 )
 from src.models import train_models
 from src.preprocessing.transformers import ensure_feature_columns
@@ -82,8 +83,7 @@ class PipelineRunner:
         db_path = get_nested(
             self.config, "storage", "db_path", default="storage/mlops.sqlite"
         )
-        db = Database(db_path)
-        try:
+        with Database(db_path) as db:
             for name in Migrator(db).migrate():
                 self.logger.info("Applied migration: %s", name)
             inserted = seed_from_kaggle(self.config, db)
@@ -94,8 +94,6 @@ class PipelineRunner:
                 "Update complete: %d new batches ingested and models retrained",
                 inserted,
             )
-        finally:
-            db.close()
 
     def _run_data_quality(self, db: Database) -> None:
         batches_without_dq = db.fetchall(
@@ -146,16 +144,13 @@ class PipelineRunner:
         db_path = get_nested(
             self.config, "storage", "db_path", default="storage/mlops.sqlite"
         )
-        db = Database(db_path)
-        try:
+        with Database(db_path) as db:
             self._ensure_no_pending_migrations(db, mode="summary")
             report_path = get_nested(
                 self.config, "report", "dq_path", default="reports/dq_report.md"
             )
             path = write_report(db, report_path)
             self.logger.info("Report saved: %s", path)
-        finally:
-            db.close()
 
     def run_inference(self, file_path: str | None) -> None:
         if file_path is None:
@@ -167,11 +162,10 @@ class PipelineRunner:
         db_path = get_nested(
             self.config, "storage", "db_path", default="storage/mlops.sqlite"
         )
-        db = Database(db_path)
-        try:
+        with Database(db_path) as db:
             self._ensure_no_pending_migrations(db, mode="inference")
             self.logger.info("Starting pipeline in 'inference' mode")
-            record = self._get_best_selected_validation_run(db)
+            record = get_best_selected_model_validation_run(db)
             bundle = load_model_bundle(record.artifact_path)
             input_df = pd.read_csv(input_path)
             output_df = self._predict_with_bundle(input_df, bundle)
@@ -183,28 +177,6 @@ class PipelineRunner:
                 record.validation_run_id,
                 output_path,
             )
-        finally:
-            db.close()
-
-    def _get_best_selected_validation_run(
-        self,
-        db: Database,
-    ) -> ModelValidationRunRecord:
-        selected_records = [
-            record for record in list_model_validation_runs(db) if record.is_selected
-        ]
-        if not selected_records:
-            raise RuntimeError(
-                "Inference requires at least one selected model. Run train mode first."
-            )
-
-        primary_metric = "f1"
-        return max(
-            selected_records,
-            key=lambda record: float(
-                json.loads(record.validation_metrics_json).get(primary_metric, float("-inf"))
-            ),
-        )
 
     def _predict_with_bundle(
         self,
@@ -257,11 +229,8 @@ class PipelineRunner:
     def run_train(self, train_config_path: str) -> None:
         self.logger.info("Starting pipeline in 'train' mode")
         db_path = get_nested(self.config, "storage", "db_path")
-        db = Database(db_path)
-        try:
+        with Database(db_path) as db:
             self._run_training(db, train_config_path=train_config_path, mode="train")
-        finally:
-            db.close()
 
     def _run_training(
         self,

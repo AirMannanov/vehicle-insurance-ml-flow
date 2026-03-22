@@ -2,23 +2,23 @@
 
 ## Summary
 
-- **Model version:** v2
-- **Validation run id:** 2
+- **Model version:** v4
+- **Validation run id:** 4
 - **Model family:** mlp
-- **Selected:** yes
-- **Created at:** 2026-03-22 21:17:00
-- **Artifact path:** `artifacts/models/mlp/20260323_001700.joblib`
+- **Selected:** no
+- **Created at:** 2026-03-22 21:27:41
+- **Artifact path:** `artifacts/models/mlp/20260323_002741.joblib`
 
 ## Metrics
 
 | Split | Accuracy | Precision | Recall | F1 | N samples | Latency ms |
 |-------|----------|-----------|--------|----|-----------|------------|
-| validation | 0.7996 | 0.2061 | 0.5628 | 0.3017 | 140518 | 56.5960 |
-| test | 0.7978 | 0.1533 | 0.5356 | 0.2384 | 147238 | 82.8406 |
+| validation | 0.7996 | 0.2061 | 0.5628 | 0.3017 | 140518 | 63.0084 |
+| test | 0.7978 | 0.1533 | 0.5356 | 0.2384 | 147238 | 80.1462 |
 
 ## Chart
 
-![Validation vs test metrics](../figures/models/model_report_mlp_v2.png)
+![Validation vs test metrics](../figures/models/model_report_mlp_v4.png)
 
 ## Class Balance
 

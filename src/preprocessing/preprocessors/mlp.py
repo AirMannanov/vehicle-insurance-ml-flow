@@ -56,15 +56,6 @@ class MLPPreprocessor(Preprocessor):
                 ),
             )
             fit = True
-        elif fit:
-            feature_columns, numeric_features, categorical_features = (
-                extract_preprocessor_feature_groups(preprocessor)
-            )
-            prepared_df = ensure_feature_columns(
-                prepared_df,
-                numeric_features,
-                categorical_features,
-            )
         else:
             if not hasattr(preprocessor, "transformers_"):
                 raise ValueError("Preprocessor must be fitted before fit=False transform")

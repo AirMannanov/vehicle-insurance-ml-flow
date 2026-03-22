@@ -9,6 +9,12 @@ class Database:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._conn: sqlite3.Connection | None = None
 
+    def __enter__(self) -> "Database":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
     @property
     def connection(self) -> sqlite3.Connection:
         if self._conn is None:

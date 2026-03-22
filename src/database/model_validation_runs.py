@@ -164,3 +164,24 @@ def get_selected_model_validation_run(
     if not rows:
         return None
     return ModelValidationRunRecord(**rows[0])
+
+
+def get_best_selected_model_validation_run(
+    db: Database,
+    *,
+    primary_metric: str = "f1",
+) -> ModelValidationRunRecord:
+    selected_records = [
+        record for record in list_model_validation_runs(db) if record.is_selected
+    ]
+    if not selected_records:
+        raise RuntimeError(
+            "Inference requires at least one selected model. Run train mode first."
+        )
+
+    return max(
+        selected_records,
+        key=lambda record: float(
+            json.loads(record.validation_metrics_json).get(primary_metric, float("-inf"))
+        ),
+    )

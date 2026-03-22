@@ -4,7 +4,6 @@ from collections.abc import Iterator
 import pandas as pd
 
 from src.database.connection import Database
-from src.database.time_queries import get_row_ids_for_exact_dates
 
 _SQLITE_IN_CLAUSE_CHUNK = 900
 
@@ -45,23 +44,3 @@ def load_rows_by_ids(
     if len(frames) == 1:
         return frames[0]
     return pd.concat(frames, ignore_index=True)
-
-
-def load_split_dataframe(
-    db: Database,
-    split_row_ids: list[int],
-    *,
-    chunk_size: int = _SQLITE_IN_CLAUSE_CHUNK,
-) -> pd.DataFrame:
-    return load_rows_by_ids(db, split_row_ids, chunk_size=chunk_size)
-
-
-def iter_ml_batches(
-    db: Database,
-    batch_dates: list[str],
-    *,
-    chunk_size: int = _SQLITE_IN_CLAUSE_CHUNK,
-) -> Iterator[tuple[str, pd.DataFrame]]:
-    for batch_date in batch_dates:
-        row_ids = get_row_ids_for_exact_dates(db, [batch_date])
-        yield batch_date, load_rows_by_ids(db, row_ids, chunk_size=chunk_size)

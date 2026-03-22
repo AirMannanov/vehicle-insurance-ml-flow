@@ -3,7 +3,7 @@ from typing import Any
 
 import pandas as pd
 
-from src.analysis.cleaning import clean_batch
+from src.analysis.cleaning import CleaningPlan, apply_cleaning_plan, clean_batch
 from src.analysis.data_quality import DQRow
 from src.preprocessing.transformers import get_feature_columns
 from src.tools import get_nested
@@ -28,8 +28,17 @@ class Preprocessor(ABC):
         self,
         df: pd.DataFrame,
         *,
+        cleaning_plan: CleaningPlan | None = None,
         dq_rows: list[DQRow] | None,
     ) -> pd.DataFrame:
+        if cleaning_plan is not None:
+            protected_columns = [
+                c for c in (self.time_column, self.target_column) if c in df.columns
+            ]
+            feature_df = df.drop(columns=protected_columns, errors="ignore")
+            cleaned_feature_df = apply_cleaning_plan(feature_df, cleaning_plan)
+            return pd.concat([df[protected_columns], cleaned_feature_df], axis=1)
+
         if dq_rows is None:
             return df.copy()
 

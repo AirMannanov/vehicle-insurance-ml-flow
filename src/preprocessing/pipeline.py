@@ -1,4 +1,5 @@
 from src.analysis.data_quality import DQRow
+from src.analysis.cleaning import CleaningPlan
 from src.preprocessing.preprocessors import (
     CatBoostPreparedData,
     CatBoostPreprocessor,
@@ -14,12 +15,14 @@ def prepare_features_for_mlp(
     df,
     config,
     *,
+    cleaning_plan: CleaningPlan | None = None,
     fit: bool = False,
     preprocessor=None,
     dq_rows: list[DQRow] | None = None,
 ) -> MLPPreparedData:
     return MLPPreprocessor(config).prepare(
         df,
+        cleaning_plan=cleaning_plan,
         fit=fit,
         preprocessor=preprocessor,
         dq_rows=dq_rows,
@@ -30,10 +33,12 @@ def prepare_features_for_catboost(
     df,
     config,
     *,
+    cleaning_plan: CleaningPlan | None = None,
     dq_rows: list[DQRow] | None = None,
 ) -> CatBoostPreparedData:
     return CatBoostPreprocessor(config).prepare(
         df,
+        cleaning_plan=cleaning_plan,
         dq_rows=dq_rows,
     )
 

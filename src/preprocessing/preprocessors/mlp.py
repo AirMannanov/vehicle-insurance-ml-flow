@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 
 import pandas as pd
+from scipy import sparse
 from sklearn.compose import ColumnTransformer
 
+from src.analysis.cleaning import CleaningPlan
 from src.analysis.data_quality import DQRow
 from src.preprocessing.preprocessors.interface import Preprocessor, extract_target
 from src.preprocessing.transformers import (
@@ -21,6 +23,7 @@ class MLPPreparedData:
     feature_columns: list[str]
     numeric_features: list[str]
     categorical_features: list[str]
+    dropped_columns: list[str]
 
 
 class MLPPreprocessor(Preprocessor):
@@ -28,12 +31,18 @@ class MLPPreprocessor(Preprocessor):
         self,
         df: pd.DataFrame,
         *,
+        cleaning_plan: CleaningPlan | None = None,
         fit: bool = False,
         preprocessor: ColumnTransformer | None = None,
         dq_rows: list[DQRow] | None = None,
     ) -> MLPPreparedData:
-        prepared_df = self.apply_optional_cleaning(df, dq_rows=dq_rows)
+        prepared_df = self.apply_optional_cleaning(
+            df,
+            cleaning_plan=cleaning_plan,
+            dq_rows=dq_rows,
+        )
         y = extract_target(prepared_df, self.target_column)
+        dropped_columns = sorted(set(df.columns) - set(prepared_df.columns))
 
         if preprocessor is None:
             feature_columns, numeric_features, categorical_features = (
@@ -72,6 +81,8 @@ class MLPPreprocessor(Preprocessor):
             X = preprocessor.fit_transform(prepared_df)
         else:
             X = preprocessor.transform(prepared_df)
+        if not sparse.issparse(X):
+            X = sparse.csr_matrix(X)
 
         return MLPPreparedData(
             X=X,
@@ -80,4 +91,5 @@ class MLPPreprocessor(Preprocessor):
             feature_columns=feature_columns,
             numeric_features=numeric_features,
             categorical_features=categorical_features,
+            dropped_columns=dropped_columns,
         )

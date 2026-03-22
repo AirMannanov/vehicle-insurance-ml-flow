@@ -1,6 +1,17 @@
 from src.database.connection import Database
 
 
+def get_all_row_ids(db: Database) -> list[int]:
+    rows = db.fetchall(
+        """
+        SELECT id
+        FROM raw_data
+        ORDER BY event_time ASC, id ASC
+        """
+    )
+    return [row["id"] for row in rows]
+
+
 def list_available_event_dates(db: Database) -> list[str]:
     rows = db.fetchall(
         """

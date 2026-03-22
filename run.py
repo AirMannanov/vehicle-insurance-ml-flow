@@ -12,6 +12,7 @@ from src.analysis.data_quality import compute_batch_dq, save_batch_dq
 from src.analysis.association_rules import compute_assoc_rules, save_assoc_rules
 from src.analysis.dq_report import write_report
 from src.database import Database, Migrator, reset_db
+from src.models import train_models
 
 
 def parse_args() -> argparse.Namespace:
@@ -50,6 +51,17 @@ class PipelineRunner:
     def __init__(self, config: dict[str, Any], logger: logging.Logger) -> None:
         self.config = config
         self.logger = logger
+
+    def _ensure_no_pending_migrations(self, db: Database, *, mode: str) -> None:
+        migration_status = Migrator(db).status()
+        pending_migrations = [
+            name for name, is_applied in migration_status.items() if not is_applied
+        ]
+        if pending_migrations:
+            raise RuntimeError(
+                f"{mode.capitalize()} mode requires an up-to-date database schema. "
+                f"Pending migrations: {pending_migrations}"
+            )
 
     def run_reset_db(self) -> None:
         reset_db(self.config)
@@ -144,8 +156,22 @@ class PipelineRunner:
 
     def run_train(self, train_config_path: str) -> None:
         self.logger.info("Starting pipeline in 'train' mode")
-        _ = load_config(train_config_path)
-        raise NotImplementedError("Train mode orchestration is not yet implemented")
+        train_config = load_config(train_config_path)
+        db_path = get_nested(self.config, "storage", "db_path")
+        db = Database(db_path)
+        try:
+            self._ensure_no_pending_migrations(db, mode="train")
+            results = train_models(db, self.config, train_config)
+            for result in results:
+                self.logger.info(
+                    "Train complete: model=%s model_id=%s rows=%s artifact=%s",
+                    result.model_name,
+                    result.model_id,
+                    result.n_rows,
+                    result.artifact_path,
+                )
+        finally:
+            db.close()
 
 
 def main() -> None:

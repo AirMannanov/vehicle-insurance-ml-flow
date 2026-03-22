@@ -65,7 +65,7 @@ def build_numeric_transformer(
 def build_categorical_transformer() -> Pipeline:
     return Pipeline([
         ("impute", SimpleImputer(strategy="constant", fill_value="missing")),
-        ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+        ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=True)),
     ])
 
 
@@ -94,6 +94,7 @@ def build_preprocessor(
     return ColumnTransformer(
         transformers,
         remainder="drop",
+        sparse_threshold=1.0,
     )
 
 

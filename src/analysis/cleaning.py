@@ -1,10 +1,16 @@
 import logging
+from dataclasses import dataclass
 
 import pandas as pd
 
 from src.analysis.data_quality import DQRow
 
 logger = logging.getLogger("mlops")
+
+
+@dataclass(slots=True)
+class CleaningPlan:
+    dropped_columns: list[str]
 
 
 def clean_batch(
@@ -53,3 +59,42 @@ def clean_batch(
     if to_drop:
         logger.info("Cleaning: dropped %d columns by thresholds: %s", len(to_drop), to_drop)
     return df[keep].copy()
+
+
+def build_cleaning_plan(
+    df: pd.DataFrame,
+    *,
+    max_missing_rate: float,
+    min_unique_ratio: float | None,
+    max_unique_ratio: float | None,
+) -> CleaningPlan:
+    """Build a reusable train-time cleaning plan from the provided DataFrame."""
+    n_rows = len(df)
+    if n_rows == 0:
+        return CleaningPlan(dropped_columns=[])
+
+    dropped_columns: list[str] = []
+    for column in df.columns:
+        series = df[column]
+        missing_rate = float(series.isna().mean())
+        if missing_rate > max_missing_rate:
+            dropped_columns.append(column)
+            continue
+
+        unique_ratio = float(series.nunique(dropna=True) / n_rows)
+        if min_unique_ratio is not None and unique_ratio < min_unique_ratio:
+            dropped_columns.append(column)
+            continue
+        if max_unique_ratio is not None and unique_ratio > max_unique_ratio:
+            dropped_columns.append(column)
+
+    return CleaningPlan(dropped_columns=dropped_columns)
+
+
+def apply_cleaning_plan(
+    df: pd.DataFrame,
+    cleaning_plan: CleaningPlan,
+) -> pd.DataFrame:
+    if not cleaning_plan.dropped_columns:
+        return df.copy()
+    return df.drop(columns=cleaning_plan.dropped_columns, errors="ignore").copy()

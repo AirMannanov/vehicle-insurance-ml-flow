@@ -8,7 +8,12 @@ from src.analysis.association_rules import (
     compute_assoc_rules,
     save_assoc_rules,
 )
-from src.analysis.cleaning import clean_batch
+from src.analysis.cleaning import (
+    CleaningPlan,
+    apply_cleaning_plan,
+    build_cleaning_plan,
+    clean_batch,
+)
 from src.analysis.dq_report import write_report
 from src.database.dataset_schema import FeatureType
 
@@ -20,6 +25,9 @@ __all__ = [
     "AssocRule",
     "compute_assoc_rules",
     "save_assoc_rules",
+    "CleaningPlan",
+    "apply_cleaning_plan",
+    "build_cleaning_plan",
     "clean_batch",
     "write_report",
 ]

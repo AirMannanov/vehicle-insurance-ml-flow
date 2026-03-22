@@ -3,3 +3,6 @@ pandas
 kagglehub
 mlxtend
 matplotlib
+scikit-learn
+catboost
+joblib

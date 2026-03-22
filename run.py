@@ -78,7 +78,7 @@ class PipelineRunner:
     def run_reset(self, train_config_path: str) -> None:
         reset_project_outputs(self.config, train_config_path=train_config_path)
 
-    def run_update(self) -> None:
+    def run_update(self, train_config_path: str) -> None:
         db_path = get_nested(
             self.config, "storage", "db_path", default="storage/mlops.sqlite"
         )
@@ -89,7 +89,11 @@ class PipelineRunner:
             inserted = seed_from_kaggle(self.config, db)
             self._run_data_quality(db)
             self._run_assoc_rules(db)
-            self.logger.info("Update complete: %d new batches ingested", inserted)
+            self._run_training(db, train_config_path=train_config_path, mode="update")
+            self.logger.info(
+                "Update complete: %d new batches ingested and models retrained",
+                inserted,
+            )
         finally:
             db.close()
 
@@ -252,30 +256,40 @@ class PipelineRunner:
 
     def run_train(self, train_config_path: str) -> None:
         self.logger.info("Starting pipeline in 'train' mode")
-        train_config = load_config(train_config_path)
         db_path = get_nested(self.config, "storage", "db_path")
         db = Database(db_path)
         try:
-            self._ensure_no_pending_migrations(db, mode="train")
-            results = train_models(db, self.config, train_config)
-            for result in results:
-                self.logger.info(
-                    "Train complete: model=%s validation_run_id=%s train_rows=%s selected=%s artifact=%s",
-                    result.model_name,
-                    result.validation_run_id,
-                    result.train_rows,
-                    result.is_selected,
-                    result.artifact_path,
-                )
-                record = next(
-                    record
-                    for record in list_model_validation_runs(db, model_name=result.model_name)
-                    if record.validation_run_id == result.validation_run_id
-                )
-                report_path = write_model_report(record)
-                self.logger.info("Model report saved: %s", report_path)
+            self._run_training(db, train_config_path=train_config_path, mode="train")
         finally:
             db.close()
+
+    def _run_training(
+        self,
+        db: Database,
+        *,
+        train_config_path: str,
+        mode: str,
+    ) -> None:
+        self._ensure_no_pending_migrations(db, mode=mode)
+        train_config = load_config(train_config_path)
+        results = train_models(db, self.config, train_config)
+        for result in results:
+            self.logger.info(
+                "%s complete: model=%s validation_run_id=%s train_rows=%s selected=%s artifact=%s",
+                mode.capitalize(),
+                result.model_name,
+                result.validation_run_id,
+                result.train_rows,
+                result.is_selected,
+                result.artifact_path,
+            )
+            record = next(
+                record
+                for record in list_model_validation_runs(db, model_name=result.model_name)
+                if record.validation_run_id == result.validation_run_id
+            )
+            report_path = write_model_report(record)
+            self.logger.info("Model report saved: %s", report_path)
 
 
 def main() -> None:
@@ -288,7 +302,7 @@ def main() -> None:
         runner.run_reset(args.train_config)
         return
     if args.mode == "update":
-        runner.run_update()
+        runner.run_update(args.train_config)
         return
     if args.mode == "summary":
         runner.run_summary()

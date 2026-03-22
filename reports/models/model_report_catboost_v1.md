@@ -5,16 +5,16 @@
 - **Model version:** v1
 - **Validation run id:** 1
 - **Model family:** catboost
-- **Selected:** no
-- **Created at:** 2026-03-22 20:28:20
-- **Artifact path:** `artifacts/models/catboost/20260322_232820.joblib`
+- **Selected:** yes
+- **Created at:** 2026-03-22 21:16:03
+- **Artifact path:** `artifacts/models/catboost/20260323_001603.joblib`
 
 ## Metrics
 
 | Split | Accuracy | Precision | Recall | F1 | N samples | Latency ms |
 |-------|----------|-----------|--------|----|-----------|------------|
-| validation | 0.7868 | 0.1977 | 0.5791 | 0.2948 | 140518 | 97.5092 |
-| test | 0.7745 | 0.1469 | 0.5860 | 0.2349 | 147238 | 362.3974 |
+| validation | 0.8023 | 0.2052 | 0.5465 | 0.2984 | 140518 | 116.6115 |
+| test | 0.7972 | 0.1538 | 0.5402 | 0.2394 | 147238 | 442.2700 |
 
 ## Chart
 
@@ -24,15 +24,15 @@
 
 | Split | True positives | Pred positives | Positive rate | Pred positive rate | Zero baseline accuracy |
 |-------|----------------|----------------|---------------|--------------------|------------------------|
-| validation | 10811 | 31665 | 0.0769 | 0.2253 | 0.9231 |
-| test | 8699 | 34702 | 0.0591 | 0.2357 | 0.9409 |
+| validation | 10811 | 28788 | 0.0769 | 0.2049 | 0.9231 |
+| test | 8699 | 30554 | 0.0591 | 0.2075 | 0.9409 |
 
 ## Confusion Matrix
 
 | Split | TP | TN | FP | FN |
 |-------|----|----|----|----|
-| validation | 6261 | 104303 | 25404 | 4550 |
-| test | 5098 | 108935 | 29604 | 3601 |
+| validation | 5908 | 106827 | 22880 | 4903 |
+| test | 4699 | 112684 | 25855 | 4000 |
 
 ## Split
 
@@ -46,10 +46,10 @@
 
 ## Feature Space
 
-- **Feature columns:** 8
-- **Numeric features:** 1
+- **Feature columns:** 13
+- **Numeric features:** 6
 - **Categorical features:** 7
-- **Dropped columns:** CARRYING_CAPACITY, CCM_TON, INSURED_VALUE, OBJECT_ID, PROD_YEAR, SEATS_NUM
+- **Dropped columns:** OBJECT_ID
 
 ## Hyperparameters
 
@@ -57,9 +57,12 @@
 {
   "allow_writing_files": false,
   "depth": 6,
-  "iterations": 300,
-  "learning_rate": 0.1,
+  "iterations": 500,
+  "l2_leaf_reg": 20.0,
+  "learning_rate": 0.05,
   "loss_function": "Logloss",
+  "random_seed": 42,
+  "scale_pos_weight": 1.5,
   "verbose": false
 }
 ```

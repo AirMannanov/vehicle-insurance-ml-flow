@@ -5,16 +5,16 @@
 - **Model version:** v2
 - **Validation run id:** 2
 - **Model family:** mlp
-- **Selected:** no
-- **Created at:** 2026-03-22 20:29:12
-- **Artifact path:** `artifacts/models/mlp/20260322_232912.joblib`
+- **Selected:** yes
+- **Created at:** 2026-03-22 21:17:00
+- **Artifact path:** `artifacts/models/mlp/20260323_001700.joblib`
 
 ## Metrics
 
 | Split | Accuracy | Precision | Recall | F1 | N samples | Latency ms |
 |-------|----------|-----------|--------|----|-----------|------------|
-| validation | 0.7790 | 0.1957 | 0.6020 | 0.2954 | 140518 | 52.9396 |
-| test | 0.7825 | 0.1485 | 0.5664 | 0.2353 | 147238 | 69.3503 |
+| validation | 0.7996 | 0.2061 | 0.5628 | 0.3017 | 140518 | 56.5960 |
+| test | 0.7978 | 0.1533 | 0.5356 | 0.2384 | 147238 | 82.8406 |
 
 ## Chart
 
@@ -24,15 +24,15 @@
 
 | Split | True positives | Pred positives | Positive rate | Pred positive rate | Zero baseline accuracy |
 |-------|----------------|----------------|---------------|--------------------|------------------------|
-| validation | 10811 | 33254 | 0.0769 | 0.2367 | 0.9231 |
-| test | 8699 | 33185 | 0.0591 | 0.2254 | 0.9409 |
+| validation | 10811 | 29521 | 0.0769 | 0.2101 | 0.9231 |
+| test | 8699 | 30393 | 0.0591 | 0.2064 | 0.9409 |
 
 ## Confusion Matrix
 
 | Split | TP | TN | FP | FN |
 |-------|----|----|----|----|
-| validation | 6508 | 102961 | 26746 | 4303 |
-| test | 4927 | 110281 | 28258 | 3772 |
+| validation | 6084 | 106270 | 23437 | 4727 |
+| test | 4659 | 112805 | 25734 | 4040 |
 
 ## Split
 
@@ -46,10 +46,10 @@
 
 ## Feature Space
 
-- **Feature columns:** 8
-- **Numeric features:** 1
+- **Feature columns:** 13
+- **Numeric features:** 6
 - **Categorical features:** 7
-- **Dropped columns:** CARRYING_CAPACITY, CCM_TON, INSURED_VALUE, OBJECT_ID, PROD_YEAR, SEATS_NUM
+- **Dropped columns:** OBJECT_ID
 
 ## Hyperparameters
 

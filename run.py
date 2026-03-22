@@ -11,7 +11,7 @@ from src.data.storage import load_batch
 from src.analysis.data_quality import compute_batch_dq, save_batch_dq
 from src.analysis.association_rules import compute_assoc_rules, save_assoc_rules
 from src.analysis.dq_report import write_report
-from src.database import Database, Migrator, reset_db
+from src.database import Database, Migrator, reset_project_outputs
 from src.models import train_models
 
 
@@ -23,8 +23,8 @@ def parse_args() -> argparse.Namespace:
         "-mode",
         type=str,
         required=True,
-        choices=["inference", "update", "reset-db", "report", "train"],
-        help="Operation mode: inference | update | reset-db | report | train",
+        choices=["inference", "update", "reset", "report", "train"],
+        help="Operation mode: inference | update | reset | report | train",
     )
     parser.add_argument(
         "-file",
@@ -63,8 +63,8 @@ class PipelineRunner:
                 f"Pending migrations: {pending_migrations}"
             )
 
-    def run_reset_db(self) -> None:
-        reset_db(self.config)
+    def run_reset(self, train_config_path: str) -> None:
+        reset_project_outputs(self.config, train_config_path=train_config_path)
 
     def run_update(self) -> None:
         db_path = get_nested(
@@ -164,10 +164,11 @@ class PipelineRunner:
             results = train_models(db, self.config, train_config)
             for result in results:
                 self.logger.info(
-                    "Train complete: model=%s model_id=%s rows=%s artifact=%s",
+                    "Train complete: model=%s validation_run_id=%s train_rows=%s selected=%s artifact=%s",
                     result.model_name,
-                    result.model_id,
-                    result.n_rows,
+                    result.validation_run_id,
+                    result.train_rows,
+                    result.is_selected,
                     result.artifact_path,
                 )
         finally:
@@ -180,8 +181,8 @@ def main() -> None:
     logger = setup_logger(config)
     runner = PipelineRunner(config, logger)
 
-    if args.mode == "reset-db":
-        runner.run_reset_db()
+    if args.mode == "reset":
+        runner.run_reset(args.train_config)
         return
     if args.mode == "update":
         runner.run_update()

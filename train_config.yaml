@@ -1,7 +1,15 @@
 dataset:
-  selection_mode: "all"  # all | date_range
+  selection_mode: "all"  # all | date_range | exact_dates
   start_date: null  # YYYY-MM-DD; используется только для date_range. null -> ограничение не задано
   end_date: null  # YYYY-MM-DD; используется только для date_range. если обе даты null, берем весь датасет
+  dates: []  # Список дат YYYY-MM-DD; используется только для selection_mode: exact_dates
+
+validation:
+  enabled: true
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  primary_metric: "f1"
 
 models:
   enabled:

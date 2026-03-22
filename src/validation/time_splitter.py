@@ -80,6 +80,19 @@ def split_event_dates(
     )
 
 
+def build_split_from_dates(
+    db: Database,
+    dates: list[str],
+    config: SplitConfig | None = None,
+) -> SplitResult:
+    config = config or SplitConfig()
+    split_result = split_event_dates(dates, config)
+    split_result.train_row_ids = get_row_ids_for_exact_dates(db, split_result.train_dates)
+    split_result.val_row_ids = get_row_ids_for_exact_dates(db, split_result.val_dates)
+    split_result.test_row_ids = get_row_ids_for_exact_dates(db, split_result.test_dates)
+    return split_result
+
+
 def build_split_from_db(
     db: Database,
     config: SplitConfig | None = None,

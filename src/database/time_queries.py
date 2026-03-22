@@ -24,6 +24,42 @@ def list_available_event_dates(db: Database) -> list[str]:
     return [row["event_date"] for row in rows]
 
 
+def get_available_event_dates_for_date_range(
+    db: Database,
+    start_date: str,
+    end_date: str,
+) -> list[str]:
+    rows = db.fetchall(
+        """
+        SELECT DISTINCT event_date
+        FROM raw_data
+        WHERE event_date BETWEEN ? AND ?
+        ORDER BY event_date ASC
+        """,
+        (start_date, end_date),
+    )
+    return [row["event_date"] for row in rows]
+
+
+def get_available_event_dates_for_exact_dates(
+    db: Database,
+    dates: list[str],
+) -> list[str]:
+    if not dates:
+        return []
+    placeholders = ", ".join("?" for _ in dates)
+    rows = db.fetchall(
+        f"""
+        SELECT DISTINCT event_date
+        FROM raw_data
+        WHERE event_date IN ({placeholders})
+        ORDER BY event_date ASC
+        """,
+        dates,
+    )
+    return [row["event_date"] for row in rows]
+
+
 def list_available_event_times(db: Database) -> list[str]:
     rows = db.fetchall(
         """

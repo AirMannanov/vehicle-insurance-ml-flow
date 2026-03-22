@@ -12,7 +12,8 @@ from src.tools import get_nested
 def extract_target(df: pd.DataFrame, target_column: str) -> pd.Series:
     if target_column not in df.columns:
         raise ValueError(f"Target column {target_column!r} not found in DataFrame")
-    return df[target_column].copy()
+    target = pd.to_numeric(df[target_column], errors="coerce")
+    return target.fillna(0).gt(0).astype(int)
 
 
 class Preprocessor(ABC):

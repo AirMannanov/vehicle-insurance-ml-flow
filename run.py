@@ -22,8 +22,8 @@ def parse_args() -> argparse.Namespace:
         "-mode",
         type=str,
         required=True,
-        choices=["inference", "update", "reset-db", "report"],
-        help="Operation mode: inference | update | reset-db | report",
+        choices=["inference", "update", "reset-db", "report", "train"],
+        help="Operation mode: inference | update | reset-db | report | train",
     )
     parser.add_argument(
         "-file",
@@ -36,6 +36,12 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default="config.yaml",
         help="Path to configuration file",
+    )
+    parser.add_argument(
+        "-train-config",
+        type=str,
+        default="train_config.yaml",
+        help="Path to train configuration file (used in train mode)",
     )
     return parser.parse_args()
 
@@ -136,6 +142,11 @@ class PipelineRunner:
         finally:
             db.close()
 
+    def run_train(self, train_config_path: str) -> None:
+        self.logger.info("Starting pipeline in 'train' mode")
+        _ = load_config(train_config_path)
+        raise NotImplementedError("Train mode orchestration is not yet implemented")
+
 
 def main() -> None:
     args = parse_args()
@@ -154,6 +165,9 @@ def main() -> None:
         return
     if args.mode == "inference":
         runner.run_inference(args.file)
+        return
+    if args.mode == "train":
+        runner.run_train(args.train_config)
         return
 
     logger.error("Unexpected mode: %s", args.mode)

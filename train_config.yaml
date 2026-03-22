@@ -1,0 +1,30 @@
+dataset:
+  selection_mode: "all"  # all | date_range | exact_dates
+  start_date: null  # YYYY-MM-DD; используется только для date_range. null -> ограничение не задано
+  end_date: null  # YYYY-MM-DD; используется только для date_range. если обе даты null, берем весь датасет
+
+models:
+  enabled:
+    - "catboost"
+    - "mlp"
+
+catboost:
+  iterations: 300
+  depth: 6
+  learning_rate: 0.1
+  loss_function: "Logloss"
+  verbose: false
+
+mlp:
+  hidden_layer_sizes: [128, 64]
+  activation: "relu"  # Для sklearn MLPClassifier: identity | logistic | tanh | relu
+  solver: "adam"  # Для sklearn MLPClassifier: lbfgs | sgd | adam
+  alpha: 0.0001
+  batch_size: 256
+  learning_rate_init: 0.001
+  max_iter: 30  # Для sklearn MLPClassifier это число эпох обучения
+  early_stopping: true  # Остановить обучение раньше, если качество на validation fraction перестало улучшаться
+  random_state: 42
+
+output:
+  artifacts_dir: "artifacts/models"

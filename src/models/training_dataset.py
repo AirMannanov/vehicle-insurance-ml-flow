@@ -23,7 +23,6 @@ def get_train_dataset_config(train_config: dict) -> TrainDatasetConfig:
     selection_mode = dataset_config.get("selection_mode", "all")
     if selection_mode not in {"all", "date_range", "exact_dates"}:
         raise ValueError(f"Unsupported dataset.selection_mode: {selection_mode!r}")
-
     dates = dataset_config.get("dates")
     if dates is not None and not isinstance(dates, list):
         raise ValueError("dataset.dates must be a list of YYYY-MM-DD strings")
@@ -56,7 +55,6 @@ def select_training_row_ids(
             dataset_config.start_date,
             dataset_config.end_date,
         )
-
     if not dataset_config.dates:
         raise ValueError(
             "dataset.dates must be a non-empty list for selection_mode='exact_dates'"

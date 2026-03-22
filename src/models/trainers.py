@@ -172,6 +172,7 @@ def _train_catboost(
     artifacts_dir: str,
 ) -> TrainResult:
     hyperparameters = (get_nested(train_config, "catboost", default={}) or {}).copy()
+    hyperparameters.setdefault("allow_writing_files", False)
     prepared = prepare_features_for_catboost(
         df,
         base_config,

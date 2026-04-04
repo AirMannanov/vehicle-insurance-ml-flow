@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  train-sample-models:
+    runs-on: ubuntu-latest
+    env:
+      MPLCONFIGDIR: /tmp/.mpl
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Reset CI outputs
+        run: python run.py -mode reset -config config.ci.yaml -train-config train_config.ci.yaml
+
+      - name: Bootstrap local sample into SQLite
+        run: python run.py -mode bootstrap-local -config config.ci.yaml -file examples/ci_training_sample.csv
+
+      - name: Train models on sample data
+        run: python run.py -mode train -config config.ci.yaml -train-config train_config.ci.yaml
+
+      - name: Upload training logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-logs
+          path: logs/ci_training.log
+          if-no-files-found: warn

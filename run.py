@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from src.tools import get_nested, load_config, setup_logger
-from src.data.bootstrap import seed_from_kaggle
+from src.data.bootstrap import seed_from_csv, seed_from_kaggle
 from src.data.storage import load_batch
 from src.analysis.data_quality import compute_batch_dq, save_batch_dq
 from src.analysis.association_rules import compute_assoc_rules, save_assoc_rules
@@ -36,14 +36,14 @@ def parse_args() -> argparse.Namespace:
         "-mode",
         type=str,
         required=True,
-        choices=["inference", "update", "reset", "summary", "train"],
-        help="Operation mode: inference | update | reset | summary | train",
+        choices=["bootstrap-local", "inference", "update", "reset", "summary", "train"],
+        help="Operation mode: bootstrap-local | inference | update | reset | summary | train",
     )
     parser.add_argument(
         "-file",
         type=str,
         default=None,
-        help="Path to input data file (required for inference mode)",
+        help="Path to input data file (required for inference and bootstrap-local modes)",
     )
     parser.add_argument(
         "-config",
@@ -93,6 +93,27 @@ class PipelineRunner:
             self.logger.info(
                 "Update complete: %d new batches ingested and models retrained",
                 inserted,
+            )
+
+    def run_bootstrap_local(self, file_path: str | None) -> None:
+        if file_path is None:
+            self.logger.error("Bootstrap-local mode requires -file argument")
+            sys.exit(1)
+        input_path = Path(file_path)
+        if not input_path.exists():
+            raise FileNotFoundError(f"Bootstrap-local file not found: {input_path}")
+
+        db_path = get_nested(
+            self.config, "storage", "db_path", default="storage/mlops.sqlite"
+        )
+        with Database(db_path) as db:
+            for name in Migrator(db).migrate():
+                self.logger.info("Applied migration: %s", name)
+            inserted = seed_from_csv(self.config, db, csv_path=str(input_path))
+            self.logger.info(
+                "Bootstrap-local complete: %d new batches ingested from %s",
+                inserted,
+                input_path,
             )
 
     def _run_data_quality(self, db: Database) -> None:
@@ -272,6 +293,9 @@ def main() -> None:
         return
     if args.mode == "update":
         runner.run_update(args.train_config)
+        return
+    if args.mode == "bootstrap-local":
+        runner.run_bootstrap_local(args.file)
         return
     if args.mode == "summary":
         runner.run_summary()

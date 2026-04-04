@@ -66,6 +66,8 @@ python run.py -mode reset
 
 - `update`  
   Загружает датасет, выполняет батчирование, сохраняет сырые данные в SQLite, считает Data Quality и association rules для новых батчей, затем переобучает модели и обновляет model reports.
+- `bootstrap-local`  
+  Загружает локальный CSV-файл в SQLite как временные батчи без внешней сети. Режим нужен для CI-friendly сценариев и локальной репетиции GitHub Actions.
 - `train`  
   Обучает модели из `train_config.yaml`, валидирует их на временном разбиении, сохраняет артефакты и отчёты по запускам.
 - `summary`  
@@ -79,6 +81,12 @@ python run.py -mode reset
 
 ```bash
 python run.py -mode inference -file "examples/inference_sample.csv"
+```
+
+Для локального bootstrap:
+
+```bash
+python run.py -mode bootstrap-local -config config.ci.yaml -file "examples/ci_training_sample.csv"
 ```
 
 ## Конфигурация
@@ -110,6 +118,13 @@ python run.py -mode inference -file "examples/inference_sample.csv"
 - гиперпараметры `catboost` и `mlp`,
 - директория для артефактов.
 
+Для CI дополнительно используются:
+
+- [config.ci.yaml](/Users/mannanovairat/codebase/MSU/mlops-project/config.ci.yaml)
+- [train_config.ci.yaml](/Users/mannanovairat/codebase/MSU/mlops-project/train_config.ci.yaml)
+
+Они настраивают отдельную SQLite-базу, отдельный лог-файл и облегчённые параметры обучения для GitHub Actions.
+
 ## Структура проекта
 
 ### Корень репозитория
@@ -124,6 +139,8 @@ python run.py -mode inference -file "examples/inference_sample.csv"
   Python-зависимости проекта.
 - [examples/inference_sample.csv](/Users/mannanovairat/codebase/MSU/mlops-project/examples/inference_sample.csv)  
   Пример входного файла для inference.
+- [examples/ci_training_sample.csv](/Users/mannanovairat/codebase/MSU/mlops-project/examples/ci_training_sample.csv)  
+  Компактный локальный sample-датасет для CI и локальной репетиции workflow.
 
 ### Исходный код
 
@@ -255,6 +272,33 @@ python run.py -mode inference -file examples/inference_sample.csv
 - модели будут обучены и сериализованы,
 - summary report будет лежать в `reports/dq_report.md`,
 - inference создаст CSV с колонками `predict_proba` и `predict`.
+
+## CI/CD
+
+Базовый workflow для второй задачи находится в [.github/workflows/ci.yml](/Users/mannanovairat/codebase/MSU/mlops-project/.github/workflows/ci.yml).
+
+Он автоматически запускается на:
+
+- `push`
+- `pull_request`
+
+Сценарий workflow:
+
+1. checkout репозитория;
+2. установка Python 3.11;
+3. установка зависимостей из `requirements.txt`;
+4. сброс CI-артефактов через `reset`;
+5. загрузка локального sample CSV в SQLite через `bootstrap-local`;
+6. обучение `CatBoost` и `MLP` на sample-данных;
+7. выгрузка логов как GitHub artifact `training-logs`.
+
+Локальная репетиция тех же шагов:
+
+```bash
+python run.py -mode reset -config config.ci.yaml -train-config train_config.ci.yaml
+python run.py -mode bootstrap-local -config config.ci.yaml -file examples/ci_training_sample.csv
+python run.py -mode train -config config.ci.yaml -train-config train_config.ci.yaml
+```
 
 ## Зависимости
 

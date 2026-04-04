@@ -2,6 +2,8 @@ import logging
 import tempfile
 from typing import Any
 
+import pandas as pd
+
 from src.tools.config import get_nested
 from src.database.connection import Database
 
@@ -25,4 +27,22 @@ def seed_from_kaggle(config: dict[str, Any], db: Database) -> int:
         df = load_all_csv(tmp_dir)
         batches = generate_batches(df, time_column=time_col)
         inserted = save_all_batches(db, batches, time_column=time_col)
+    return inserted
+
+
+def seed_from_csv(
+    config: dict[str, Any],
+    db: Database,
+    *,
+    csv_path: str,
+) -> int:
+    """Load a local CSV file into SQLite as time-based batches."""
+    from src.data.batch_generator import generate_batches
+    from src.data.storage import save_all_batches
+
+    time_col = get_nested(config, "data", "time_column", default="INSR_BEGIN")
+    logger.info("Loading local CSV dataset from %s", csv_path)
+    df = pd.read_csv(csv_path)
+    batches = generate_batches(df, time_column=time_col)
+    inserted = save_all_batches(db, batches, time_column=time_col)
     return inserted

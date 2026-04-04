@@ -1,0 +1,23 @@
+data:
+  raw_dir: "examples"
+  time_column: "INSR_BEGIN"
+  target_column: "CLAIM_PAID"
+
+cleaning:
+  max_missing_rate: 0.5
+  min_unique_ratio: 0.0
+  max_unique_ratio: 0.90
+  forced_drop_columns: ["OBJECT_ID"]
+
+preprocessing:
+  scaler: "standard"
+
+report:
+  dq_path: "reports/ci_dq_report.md"
+
+storage:
+  db_path: "storage/ci_mlops.sqlite"
+
+logging:
+  level: "INFO"
+  log_file: "logs/ci_training.log"
